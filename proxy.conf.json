@@ -1,0 +1,10 @@
+{
+  "/api": {
+    "target": "https://us-central1-gothic-calling-450712-s0.cloudfunctions.net",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api": "/function-1"
+    }
+  }
+}
