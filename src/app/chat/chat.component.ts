@@ -28,7 +28,7 @@ export default class ChatComponent {
 
   constructor(private http: HttpClient) {
     this.openai = new OpenAI({
-      apiKey: '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', // Usa una variable de entorno
+      // apiKey: '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', // Usa una variable de entorno
       dangerouslyAllowBrowser: true,
     });
   }
