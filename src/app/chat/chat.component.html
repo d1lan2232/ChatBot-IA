@@ -1,17 +1,25 @@
 <div class="chat-wrapper">
   <div class="chat-container">
     <div class="chat-header">
+      
       <h2>Chatbot de Clasificación de Imágenes</h2>
+
+      <!-- Indicador de carga que se muestra mientras se espera la respuesta -->
+      <div *ngIf="isLoading" class="loading-indicator">
+        <p style="font-size: small;">Mientras analizo tu mensaje, mira este gato:</p>
+        <img src="https://i.gifer.com/2ull.gif" style="width: 50px; height: auto; text-align: center;" alt="Cargando..." />
+      </div>
     </div>
 
     <div class="chat-body">
+      
       <!-- Mensajes del chat -->
       <div *ngFor="let message of messages" class="message" [ngClass]="{'user-message': message.sender === 'User', 'bot-message': message.sender === 'Chatbot'}">
         <div class="bubble">
           <strong>{{ message.sender }}:</strong>
           <span *ngIf="message.text">{{ message.text }}</span>
         </div>
-
+        
         <div *ngIf="message.audio" class="audio-message">
           <audio [src]="message.audio" controls></audio>
         </div>
@@ -34,7 +42,6 @@
         🎤
       </button>
 
-      <!-- From Uiverse.io by adamgiebl -->
       <div style="padding-left: 4px;">
         <button (click)="sendMessage()" class="button">
           <div class="svg-wrapper-1">

@@ -1,4 +1,4 @@
-/*import { FormsModule } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
@@ -24,11 +24,11 @@ export default class ChatComponent {
   mediaRecorder: MediaRecorder | null = null;
   stream: MediaStream | null = null;
   openai: OpenAI;
+  isLoading = false;  // Variable de estado para mostrar el cargando
 
   constructor(private http: HttpClient) {
     this.openai = new OpenAI({
-      apiKey:
-        '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', // Usa una variable de entorno
+      apiKey: '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', // Usa una variable de entorno
       dangerouslyAllowBrowser: true,
     });
   }
@@ -36,6 +36,10 @@ export default class ChatComponent {
   async sendMessage() {
     if (this.userMessage.trim()) {
       this.messages.push({ sender: 'User', text: this.userMessage });
+      this.isLoading = true; // Activamos el cargando mientras obtenemos la respuesta
+
+      // Agregar un mensaje de carga
+      this.messages.push({ sender: 'Chatbot', text: '🔄 Cargando...' });
 
       try {
         const thread = await this.openai.beta.threads.create();
@@ -50,10 +54,7 @@ export default class ChatComponent {
 
         // Esperamos hasta que la ejecución esté completada
         while (true) {
-          const updatedRun = await this.openai.beta.threads.runs.retrieve(
-            thread.id,
-            run.id
-          );
+          const updatedRun = await this.openai.beta.threads.runs.retrieve(thread.id, run.id);
           if (updatedRun.status === 'completed') {
             break;
           }
@@ -61,24 +62,17 @@ export default class ChatComponent {
         }
 
         // Obtener la lista de mensajes del asistente
-        const messagesResponse = await this.openai.beta.threads.messages.list(
-          thread.id
-        );
-        console.log('Messages Response:', messagesResponse);
+        const messagesResponse = await this.openai.beta.threads.messages.list(thread.id);
 
-        const assistantMessages = messagesResponse.data.filter(
-          (msg) => msg.role === 'assistant'
-        );
+        const assistantMessages = messagesResponse.data.filter((msg) => msg.role === 'assistant');
 
         if (assistantMessages.length > 0) {
-          const textContent = assistantMessages[0].content.find(
-            (c) => c.type === 'text'
-          );
-
-          if (textContent && 'value' in textContent) {
+          const textContent = assistantMessages[0].content.find((c) => c.type === 'text');
+          if (textContent && 'text' in textContent) {
+            // Aquí agregamos la respuesta parcial del chatbot en streaming
             this.messages.push({
               sender: 'Chatbot',
-              text: textContent.value as string,
+              text: textContent.text.value as string,
             });
           } else {
             console.error('No se encontró contenido de texto válido en la respuesta');
@@ -97,123 +91,100 @@ export default class ChatComponent {
       } catch (error: unknown) {
         console.error('Error al obtener la respuesta:', error);
         let errorMessage = 'Ocurrió un error al procesar tu mensaje.';
-
         if (error instanceof Error) {
           errorMessage = `Error: ${error.message || 'Desconocido'}`;
         }
-
         this.messages.push({
           sender: 'Chatbot',
           text: errorMessage,
         });
       }
 
+      // Desactivar el cargando
+      this.isLoading = false;
       this.userMessage = '';
     }
   }
 
+  // Función para gestionar la grabación de audio (sin cambios)
   startRecording() {
     if (this.isRecording) {
-      // Detener la grabación si ya estamos grabando
       if (this.mediaRecorder) {
         this.mediaRecorder.stop();
-        this.stream?.getTracks().forEach(track => track.stop()); // Detener el stream
+        this.stream?.getTracks().forEach(track => track.stop());
       }
-      this.isRecording = false; // Cambiar el estado a no grabando
+      this.isRecording = false;
       return;
     }
 
-    // Si no estamos grabando, iniciar la grabación
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
-          this.stream = stream; // Guardar el stream
-          this.mediaRecorder = new MediaRecorder(stream); // Crear una nueva instancia de MediaRecorder
+          this.stream = stream;
+          this.mediaRecorder = new MediaRecorder(stream);
           this.mediaRecorder.start();
-          this.isRecording = true; // Cambiar el estado a grabando
+          this.isRecording = true;
 
-          // Cuando se tenga datos disponibles, crear la URL del audio
           this.mediaRecorder.ondataavailable = (event) => {
             const audioBlob = event.data;
-            const audioUrl = URL.createObjectURL(audioBlob); // Crear la URL para reproducir el audio
+            const audioUrl = URL.createObjectURL(audioBlob);
 
-            // Agregar solo el audio sin texto
             this.messages.push({
               sender: 'User',
-              audio: audioUrl // Guardar la URL del audio en el mensaje
+              audio: audioUrl,
             });
-            console.log('Audio URL:', audioUrl);
-
-            // Aquí agregamos la función para que el chatbot responda con voz después de que el usuario envía un mensaje de voz.
             this.sendVoiceResponse();
           };
 
           setTimeout(() => {
             if (this.mediaRecorder) {
               this.mediaRecorder.stop();
-              this.stream?.getTracks().forEach(track => track.stop()); // Detener el stream automáticamente después de 3 segundos
-              this.isRecording = false; // Cambiar el estado a no grabando
+              this.stream?.getTracks().forEach(track => track.stop());
+              this.isRecording = false;
             }
-          }, 3000); // Graba por 3 segundos
+          }, 3000);
         })
         .catch(error => {
           console.error('Error al grabar audio:', error);
         });
-    } else {
-      console.error('El navegador no soporta grabación de audio.');
     }
   }
 
   sendVoiceResponse() {
-    // Simulamos una respuesta del chatbot en voz
-    const responseText = "Hola, no entendí";
-
-    // Usamos la API de SpeechSynthesis para que el chatbot hable
+    const responseText = " Hola, no entendí";
     const synth = window.speechSynthesis;
     const utterance = new SpeechSynthesisUtterance(responseText);
-
-    // Opcional: configurar la voz y la velocidad del speech
-    utterance.pitch = 1; // Tono de voz
-    utterance.rate = 1; // Velocidad de la voz
-
-    // Reproducir la voz
+    utterance.pitch = 1;
+    utterance.rate = 1;
     synth.speak(utterance);
 
-    // Agregar el mensaje del chatbot con el texto
     this.messages.push({
       sender: 'Chatbot',
       text: responseText,
-      audio: null // El chatbot responde con un mensaje de texto (aunque también puede ser de voz)
+      audio: null
     });
   }
 
+  // Función para manejar la selección de imagen (sin cambios)
   onFileSelected(event: any) {
     const file: File = event.target.files[0];
-
     if (file && file.type.startsWith('image/')) {
-      // Limpiar la vista previa de la imagen previa
       this.imagePreview = undefined;
 
-      // Crear un FormData para enviar la imagen
       const formData = new FormData();
       formData.append('image', file, file.name);
 
-      // Crear una URL para previsualizar la imagen
       const reader = new FileReader();
       reader.onload = () => {
-        this.imagePreview = reader.result as string; // Establecer la nueva vista previa
-        // Agregar solo la imagen (sin mensaje de texto) al array de mensajes
+        this.imagePreview = reader.result as string;
         this.messages.push({ sender: 'User', text: '', image: this.imagePreview });
 
-        // Realizar la solicitud POST al backend para clasificar la imagen
         this.http.post<any>(this.apiURL, formData).subscribe(
           (response) => {
             console.log('Respuesta de la clasificación de la imagen:', response);
             if (response && response.prediction && response.probability) {
               const prediction = response.prediction;
-              const probability = (response.probability * 100).toFixed(2); // Convertir a porcentaje
-
-              // Agregar la predicción correspondiente al mensaje
+              const probability = (response.probability * 100).toFixed(2);
               this.messages.push({
                 sender: 'Chatbot',
                 text: `🔍 La imagen parece ser un **${prediction}** con una probabilidad del **${probability}%**`
@@ -234,7 +205,7 @@ export default class ChatComponent {
           }
         );
       };
-      reader.readAsDataURL(file); // Leer la imagen y generar la URL
+      reader.readAsDataURL(file);
     } else {
       this.messages.push({
         sender: 'Chatbot',
@@ -242,4 +213,4 @@ export default class ChatComponent {
       });
     }
   }
-}*/
+}
